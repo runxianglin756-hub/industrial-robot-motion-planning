@@ -1,0 +1,1174 @@
+import pybullet as p
+import pybullet_data
+import time
+import math
+import numpy as np
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+import os
+
+
+# =================================================
+# Connect PyBullet
+# =================================================
+
+p.connect(p.GUI)
+
+p.setAdditionalSearchPath(
+    pybullet_data.getDataPath()
+)
+
+p.setGravity(
+    0,
+    0,
+    -50
+)
+
+
+p.configureDebugVisualizer(
+    p.COV_ENABLE_GUI,
+    0
+)
+
+
+p.resetDebugVisualizerCamera(
+
+    cameraDistance=1.8,
+    cameraYaw=35,
+    cameraPitch=-35,
+
+    cameraTargetPosition=[
+        0.5,
+        0.2,
+        0.5
+    ]
+
+)
+
+
+
+# =================================================
+# Environment
+# =================================================
+
+
+p.loadURDF(
+    "plane.urdf"
+)
+
+
+
+p.loadURDF(
+
+    "table/table.urdf",
+
+    [
+        0.5,
+        0,
+        0
+    ]
+
+)
+
+
+
+# =================================================
+# Obstacle
+# =================================================
+
+
+obstacle_position=np.array(
+
+[
+0.5,
+0.25,
+0
+
+]
+
+)
+
+
+
+obstacle_visual=p.createVisualShape(
+
+    p.GEOM_BOX,
+
+    halfExtents=[
+
+        0.12,
+        0.12,
+        0.15
+
+    ],
+
+    rgbaColor=[
+
+        1,
+        0,
+        0,
+        1
+
+    ]
+
+)
+
+
+
+p.createMultiBody(
+
+    baseMass=0,
+
+    baseVisualShapeIndex=
+    obstacle_visual,
+
+    basePosition=
+    obstacle_position
+
+)
+
+
+
+p.addUserDebugText(
+
+    "OBSTACLE",
+
+    [
+        0.5,
+        0.25,
+        0.90
+    ],
+
+    textColorRGB=[
+
+        1,
+        0,
+        3
+
+    ],
+
+    textSize=1
+
+)
+
+
+
+# =================================================
+# Robot
+# =================================================
+
+
+robot=p.loadURDF(
+
+    "franka_panda/panda.urdf",
+
+    [
+        0,
+        -0.35,
+        0.65
+    ],
+
+    useFixedBase=True
+
+)
+
+
+
+arm_joints=range(7)
+
+ik_link=11
+
+hand_link=8
+
+
+
+# =================================================
+# Object
+# =================================================
+
+
+cube=p.loadURDF(
+
+    "cube_small.urdf",
+
+    [
+        0.75,
+        -0.25,
+        0.68
+    ],
+
+    globalScaling=1.5
+
+)
+
+
+
+# =================================================
+# APF Automatic Obstacle Avoidance
+# =================================================
+
+
+def apf_path(
+
+        start,
+
+        goal,
+
+        obstacle,
+
+        step_size=0.05,
+
+        max_iter=120):
+
+
+    path=[]
+
+
+    current=np.array(
+
+        start,
+
+        dtype=float
+
+    )
+
+
+    goal=np.array(
+
+        goal,
+
+        dtype=float
+
+    )
+
+
+    obstacle=np.array(
+
+        obstacle,
+
+        dtype=float
+
+    )
+
+
+
+    for i in range(max_iter):
+
+
+        path.append(
+
+            current.tolist()
+
+        )
+
+
+
+        # attractive force
+
+        attractive=goal-current
+
+
+        distance=np.linalg.norm(
+
+            attractive
+
+        )
+
+
+        if distance < step_size:
+
+            break
+
+
+
+        attractive /= np.linalg.norm(
+
+            attractive
+
+        )
+
+
+
+        # repulsive force
+
+        diff=current-obstacle
+
+
+        obs_distance=np.linalg.norm(
+
+            diff
+
+        )
+
+
+        repulsive=np.zeros(3)
+
+
+
+        influence=0.45
+
+
+
+        if obs_distance < influence:
+
+
+            repulsive=(
+
+                diff /
+
+                (obs_distance**3+1e-6)
+
+            )
+
+
+
+        direction=(
+
+            attractive
+
+            +
+
+            0.08*repulsive
+
+        )
+
+
+
+        direction /= np.linalg.norm(
+
+            direction
+
+        )
+
+
+
+        current += (
+
+            step_size *
+
+            direction
+
+        )
+
+
+
+    path.append(
+
+        goal.tolist()
+
+    )
+
+
+    return path
+
+# =================================================
+# Motion Control
+# =================================================
+
+
+path_record=[]
+
+
+
+def quintic(q0,qf,steps=60):
+
+
+    trajectory=[]
+
+
+    for i in range(steps):
+
+        s=i/(steps-1)
+
+
+        h=(
+
+            10*s**3
+
+            -
+
+            15*s**4
+
+            +
+
+            6*s**5
+
+        )
+
+
+        trajectory.append(
+
+            q0+(qf-q0)*h
+
+        )
+
+
+    return trajectory
+
+
+
+
+
+
+def move_joint(target):
+
+
+    current=[]
+
+
+    for j in arm_joints:
+
+
+        current.append(
+
+            p.getJointState(
+
+                robot,
+
+                j
+
+            )[0]
+
+        )
+
+
+
+    trajectory=quintic(
+
+        np.array(current),
+
+        np.array(target[:7])
+
+    )
+
+
+
+    for q in trajectory:
+
+
+        for j in arm_joints:
+
+
+            p.setJointMotorControl2(
+
+                robot,
+
+                j,
+
+                p.POSITION_CONTROL,
+
+                q[j],
+
+                force=500
+
+            )
+
+
+        p.stepSimulation()
+
+
+        time.sleep(0.015)
+
+
+
+
+
+
+
+
+def move_arm(position):
+
+
+    path_record.append(
+
+        position
+
+    )
+
+
+
+    orientation=p.getQuaternionFromEuler(
+
+        [
+
+            math.pi,
+
+            0,
+
+            0
+
+        ]
+
+    )
+
+
+
+    joint_pose=p.calculateInverseKinematics(
+
+        robot,
+
+        ik_link,
+
+        position,
+
+        orientation
+
+    )
+
+
+    move_joint(
+
+        joint_pose
+
+    )
+
+
+
+
+
+
+
+
+# =================================================
+# Gripper
+# =================================================
+
+
+def gripper(open=True):
+
+
+    if open:
+
+        width=0.035
+
+    else:
+
+        width=0.005
+
+
+
+    p.setJointMotorControl2(
+
+        robot,
+
+        9,
+
+        p.POSITION_CONTROL,
+
+        width,
+
+        force=50
+
+    )
+
+
+    p.setJointMotorControl2(
+
+        robot,
+
+        10,
+
+        p.POSITION_CONTROL,
+
+        width,
+
+        force=50
+
+    )
+
+
+
+    for i in range(30):
+
+
+        p.stepSimulation()
+
+        time.sleep(0.02)
+
+
+
+
+
+
+
+
+def attach_object():
+
+
+    cid=p.createConstraint(
+
+        robot,
+
+        hand_link,
+
+        cube,
+
+        -1,
+
+        p.JOINT_FIXED,
+
+        [0,0,0],
+
+        [0,0,0],
+
+        [0,0,0]
+
+    )
+
+
+    p.changeConstraint(
+
+        cid,
+
+        maxForce=100
+
+    )
+
+
+    return cid
+
+
+
+
+
+# =================================================
+# Labels
+# =================================================
+
+
+p.addUserDebugText(
+
+    "PICK",
+
+    [
+
+        0.75,
+
+        -0.25,
+
+        0.95
+
+    ],
+
+    textColorRGB=[
+
+        1,
+
+        1,
+
+        0
+
+    ],
+
+    textSize=1.5
+
+)
+
+
+
+p.addUserDebugText(
+
+    "PLACE",
+
+    [
+
+        0.15,
+
+        0.35,
+
+        0.95
+
+    ],
+
+    textColorRGB=[
+
+        0,
+
+        1,
+
+        0
+
+    ],
+
+    textSize=1.5
+
+)
+
+
+
+
+
+
+# =================================================
+# Pick and Place Task
+# =================================================
+
+
+print("======================")
+
+print("Move above object")
+
+print("======================")
+
+
+
+# Move above cube
+
+move_arm(
+
+    [
+
+        0.75,
+
+        -0.25,
+
+        0.95
+
+    ]
+
+)
+
+
+
+# Lower to cube
+
+print("Picking")
+
+
+move_arm(
+
+    [
+
+        0.75,
+
+        -0.25,
+
+        0.73
+
+    ]
+
+)
+
+
+
+# Close gripper
+
+gripper(False)
+
+
+time.sleep(1)
+
+
+
+# Attach cube
+
+constraint=attach_object()
+
+
+
+print("Object attached")
+
+
+
+
+
+# Lift
+
+print("Lift")
+
+
+move_arm(
+
+    [
+
+        0.75,
+
+        -0.25,
+
+        1.05
+
+    ]
+
+)
+
+
+
+
+
+# =================================================
+# APF Planning
+# =================================================
+
+
+print("======================")
+
+print("APF automatic avoidance")
+
+print("======================")
+
+
+apf_points=apf_path(
+
+    [
+
+        0.75,
+
+        -0.25,
+
+        1.05
+
+    ],
+
+    [
+
+        0.15,
+
+        0.35,
+
+        1.05
+
+    ],
+
+    obstacle_position
+
+)
+
+
+
+for point in apf_points:
+
+
+    move_arm(
+
+        point
+
+    )
+
+
+
+
+
+
+
+# =================================================
+# Slow Place
+# =================================================
+
+
+print("Slow lowering")
+
+
+
+move_arm(
+
+    [
+
+        0.15,
+
+        0.35,
+
+        1.05
+
+    ]
+
+)
+
+
+
+move_arm(
+
+    [
+
+        0.15,
+
+        0.30,
+
+        0.90
+
+    ]
+
+)
+
+
+
+move_arm(
+
+    [
+
+        0.15,
+
+        0.25,
+
+        0.80
+
+    ]
+
+)
+
+
+
+time.sleep(1)
+
+
+
+
+
+# Release cube
+
+
+print("Release")
+
+
+p.removeConstraint(
+
+    constraint
+
+)
+
+
+gripper(True)
+
+
+
+time.sleep(1)
+
+
+
+
+
+# Lift after release
+
+
+print("Lift after release")
+
+
+move_arm(
+
+    [
+
+        0.15,
+
+        0.35,
+
+        1.05
+
+    ]
+
+)
+
+
+
+
+
+
+# =================================================
+# Return Home
+# =================================================
+
+
+print("Return Home")
+
+
+move_arm(
+
+    [
+
+        0,
+
+        0.5,
+
+        1.5
+
+    ]
+
+)
+
+
+
+
+
+
+
+# =================================================
+# Draw trajectory
+# =================================================
+
+
+for i in range(
+
+        len(path_record)-1
+
+):
+
+
+    p.addUserDebugLine(
+
+        path_record[i],
+
+        path_record[i+1],
+
+        lineColorRGB=[
+
+            0,
+
+            0,
+
+            1
+
+        ],
+
+        lineWidth=10
+
+    )
+
+
+
+
+
+
+# =================================================
+# Save trajectory figure
+# =================================================
+
+trajectory = np.array(path_record)
+
+
+fig = plt.figure(figsize=(8,6))
+
+ax = fig.add_subplot(111, projection='3d')
+
+
+# robot trajectory
+
+ax.plot(
+
+    trajectory[:,0],
+
+    trajectory[:,1],
+
+    trajectory[:,2],
+
+    linewidth=3,
+
+    label="Robot End-effector Path"
+
+)
+
+
+
+# Start point
+
+ax.scatter(
+
+    trajectory[0,0],
+
+    trajectory[0,1],
+
+    trajectory[0,2],
+
+    s=100,
+
+    label="Start"
+
+)
+
+
+
+# End point
+
+ax.scatter(
+
+    trajectory[-1,0],
+
+    trajectory[-1,1],
+
+    trajectory[-1,2],
+
+    s=100,
+
+    label="End"
+
+)
+
+
+
+# obstacle
+
+ax.scatter(
+
+    obstacle_position[0],
+
+    obstacle_position[1],
+
+    obstacle_position[2],
+
+    s=200,
+
+    label="Obstacle"
+
+)
+
+
+
+ax.set_xlabel("X (m)")
+
+ax.set_ylabel("Y (m)")
+
+ax.set_zlabel("Z (m)")
+
+
+ax.set_title(
+    "Robot End-effector Trajectory with APF Obstacle Avoidance"
+)
+
+
+ax.legend()
+
+
+
+# save path
+
+save_path = "results/stage4_trajectory.png"
+
+
+os.makedirs(
+
+    "results",
+
+    exist_ok=True
+
+)
+
+
+plt.savefig(
+
+    save_path,
+
+    dpi=300,
+
+    bbox_inches="tight"
+
+)
+
+
+plt.show()
+
+
+
+print("======================")
+print("Simulation finished")
+print("Trajectory saved:")
+print(save_path)
+print("Close window manually")
+print("======================")
+
+
+
+# Keep PyBullet window
+
+while True:
+
+    p.stepSimulation()
+
+    time.sleep(0.05)
+
