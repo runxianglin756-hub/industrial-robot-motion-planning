@@ -1,77 +1,308 @@
-7-DOF Robot Motion Planning and Obstacle Avoidance Simulation
+Industrial Robot Motion Planning and Pick-and-Place Simulation
+Overview
 
-1. Project Overview
-This project develops a complete robotic motion planning framework for a 7-DOF industrial robot. The system implements joint-space trajectory generation, Cartesian-space interpolation, velocity planning, and obstacle avoidance algorithms.
-The developed framework is tested in a PyBullet simulation environment to demonstrate smooth robot motion and collision-free path planning.
+This project develops an integrated industrial robot motion planning and pick-and-place simulation system using PyBullet and a Franka Panda 7-DOF robotic manipulator.
 
-2. Features
-The project includes:
-Joint space trajectory planning
-Cubic polynomial interpolation
-Quintic polynomial interpolation
-Trapezoidal velocity planning
-Cartesian linear interpolation
-Circular arc interpolation
-End-effector trajectory analysis
+The system integrates robot kinematics, trajectory planning, obstacle avoidance, and task scheduling into a complete autonomous robotic manipulation workflow.
+
+The final simulation demonstrates that the robot can automatically move to an object, grasp the object, avoid obstacles, place it at a target location, and return to the home position.
+
+Features
+
+The main functions implemented in this project include:
+
+Forward kinematics calculation
+Inverse kinematics solving
+Cartesian trajectory generation
+Cubic and quintic polynomial interpolation
+Smooth robot motion control
 Artificial Potential Field (APF) obstacle avoidance
-PyBullet simulation
+Automated pick-and-place task scheduling
+PyBullet physics simulation
+End-effector trajectory visualization
+System Architecture
 
-3. Algorithms
-Joint Space Planning
-Polynomial interpolation methods are used to generate smooth joint trajectories.
-Implemented methods:
-Cubic polynomial
-Quintic polynomial
-Velocity Planning
-A trapezoidal velocity profile is implemented to satisfy robot acceleration constraints.
-Cartesian Planning
-The end-effector trajectory is generated using:
-Linear interpolation
-Circular interpolation
+The system is organized into multiple functional modules:
+
+Task Command
+
+↓
+
+Task Scheduler
+
+↓
+
+Motion Planning
+
+↓
+
+Obstacle Avoidance (APF)
+
+↓
+
+Inverse Kinematics
+
+↓
+
+Robot Controller
+
+↓
+
+PyBullet Simulation Environment
+
+The complete robot task workflow is:
+
+Home Position
+
+↓
+
+Move to Object
+
+↓
+
+Grasp Object
+
+↓
+
+Lift Object
+
+↓
+
 Obstacle Avoidance
-A modified Artificial Potential Field method is implemented.
-The algorithm combines:
-Attractive force
-Repulsive force
-Tangential force
-to avoid local minimum problems.
 
-4. Simulation Results
-Trajectory Comparison
-The project compares different trajectory generation methods using:
-Position profiles
-Velocity profiles
-Acceleration profiles
-Obstacle Avoidance
-The APF algorithm successfully generates collision-free trajectories around static obstacles.
+↓
 
-5. Environment
-Python packages:
-numpy
-matplotlib
-pybullet
-pandas
-Install dependencies:
+Move to Target Position
+
+↓
+
+Release Object
+
+↓
+
+Return Home
+
+Technologies
+
+The project is developed using:
+
+Python
+PyBullet
+NumPy
+Matplotlib
+
+Main algorithms:
+
+Denavit-Hartenberg (DH) based kinematics
+Numerical inverse kinematics
+Polynomial trajectory interpolation
+Artificial Potential Field (APF) path planning
+Project Structure
+
+industrial-robot-motion-planning
+
+│
+
+├── src
+
+│ ├── stage4_demo.py
+
+│ ├── task_scheduler.py
+
+│ ├── robot_system.py
+
+│ ├── apf_obstacle_avoidance.py
+
+│ ├── trajectory_planning.py
+
+│ ├── inverse_kinematics.py
+
+│ └── other robot control modules
+
+│
+
+├── results
+
+│ ├── trajectory figures
+
+│ └── simulation screenshots
+
+│
+
+├── docs
+
+│ ├── system architecture
+
+│ ├── performance reports
+
+│ └── project documentation
+
+│
+
+├── README.md
+
+│
+
+└── requirements.txt
+
+Installation
+
+Clone this repository:
+
+git clone https://github.com/runxianglin756-hub/industrial-robot-motion-planning.git
+
+Enter the project folder:
+
+cd industrial-robot-motion-planning
+
+Install required packages:
+
 pip install -r requirements.txt
 
-6. Run Simulation
-Trajectory comparison:
-python src/trajectory_comparison.py
-Obstycle avoidance:
-python src/apf_obstacle_avoidance.py
-Full demonstration:
-python src/stage3_demo.py
+or:
 
-7. Results
-The simulation demonstrates that the robot can:
-Generate smooth trajectories
-Follow Cartesian paths
-Avoid static obstacles
-Complete planned motion tasks
+pip install pybullet numpy matplotlib
 
-## Future Improvements
-Future work could include:
-- Integration with ROS and MoveIt for real robotic control.
-- Implementation of inverse kinematics-based trajectory tracking.
-- Dynamic obstacle avoidance using sensor feedback.
-- Testing on a physical robotic manipulator.
+Running the Simulation
+
+Run the integrated robot simulation:
+
+python src/stage4_demo.py
+
+The simulation automatically performs:
+
+Robot initialization
+Move to pick position
+Object grasping
+Object lifting
+Obstacle avoidance trajectory generation
+Object placement
+Return to home position
+Obstacle Avoidance
+
+The system uses an Artificial Potential Field (APF) algorithm for collision-free motion planning.
+
+The APF algorithm contains two main components:
+
+Attractive Force
+
+The target position generates an attractive force that guides the robot toward the goal.
+
+Repulsive Force
+
+The obstacle generates a repulsive force that pushes the robot away from unsafe regions.
+
+The combined potential field generates a safe trajectory while maintaining smooth robot motion.
+
+Trajectory Planning
+
+Smooth trajectory generation is achieved using polynomial interpolation.
+
+Implemented trajectory methods include:
+
+Cubic polynomial trajectory
+Quintic polynomial trajectory
+
+The trajectory planner ensures continuous:
+
+Position
+Velocity
+Acceleration
+
+This reduces sudden movement changes and improves robot motion stability.
+
+Simulation Results
+
+The system successfully demonstrates:
+
+Autonomous pick-and-place operation
+Collision-free obstacle avoidance
+Smooth end-effector trajectory
+Complete task execution
+
+The complete workflow is:
+
+Start
+
+↓
+
+Pick
+
+↓
+
+Lift
+
+↓
+
+Avoid Obstacle
+
+↓
+
+Place
+
+↓
+
+Return Home
+
+↓
+
+Finish
+
+Performance Evaluation
+
+Multiple simulation scenarios were tested.
+
+Scenario 1: Normal Pick-and-Place
+
+Obstacle:
+
+None
+
+Result:
+
+Task completion: Successful
+
+Collision: None
+
+Trajectory: Smooth
+
+Scenario 2: Static Obstacle Avoidance
+
+Obstacle:
+
+Static obstacle placed between start and target positions
+
+Result:
+
+Task completion: Successful
+
+Collision: None
+
+Obstacle avoidance: Successful
+
+Scenario 3: Different Obstacle Position
+
+Obstacle:
+
+Modified obstacle location
+
+Result:
+
+Task completion: Successful
+
+Collision: None
+
+Path generation: Successful
+
+The robot successfully completed all tested scenarios without collision.
+
+Future Improvements
+
+Possible improvements include:
+
+Dynamic obstacle avoidance
+Camera-based object detection
+ROS framework integration
+Real industrial robot deployment
+Force feedback control
+Advanced path optimization algorithms
