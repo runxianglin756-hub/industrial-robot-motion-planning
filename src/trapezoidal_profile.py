@@ -1,302 +1,161 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import os
 
 
-# ==========================
-# Path
-# ==========================
+class TrapezoidalProfile:
+    """
+    Trapezoidal velocity trajectory generator
 
-project_path = "/Users/lin/Desktop/ur5_robot_project"
+    Generates position, velocity and acceleration
+    with acceleration, constant velocity and deceleration phases.
+    """
 
-result_dir = os.path.join(
-    project_path,
-    "results"
-)
+    def __init__(self, q0, qf, total_time, vmax, amax):
 
-os.makedirs(
-    result_dir,
-    exist_ok=True
-)
+        self.q0 = q0
+        self.qf = qf
+        self.T = total_time
+        self.vmax = vmax
+        self.amax = amax
 
-
-# ==========================
-# Parameters
-# ==========================
-
-q_start = 0.0
-q_end = 1.5
-
-T = 4.0
-
-v_max = 0.6       # maximum velocity rad/s
-a_max = 1.0       # maximum acceleration rad/s^2
+        self.distance = qf - q0
 
 
-time = np.linspace(
-    0,
-    T,
-    400
-)
+    def generate(self, dt=0.01):
+
+        t = np.arange(0, self.T + dt, dt)
+
+        distance = abs(self.distance)
+
+        # acceleration time
+        ta = self.vmax / self.amax
 
 
-distance = q_end - q_start
+        # Check if trapezoidal or triangular profile
+        if 2 * ta * self.vmax > distance:
+
+            # triangular velocity profile
+            ta = np.sqrt(distance / self.amax)
+            tv = 0
+            vmax = self.amax * ta
+
+        else:
+
+            # normal trapezoidal
+            tv = (distance - self.amax * ta**2) / self.vmax
+            vmax = self.vmax
 
 
-# acceleration time
-
-t_acc = v_max / a_max
+        td = ta
 
 
-# distance during acceleration
+        position = []
+        velocity = []
+        acceleration = []
 
-d_acc = 0.5 * a_max * t_acc**2
+
+        direction = np.sign(self.distance)
 
 
-# check if trapezoidal or triangular
+        for time in t:
 
-if 2*d_acc > distance:
 
-    # triangular profile
+            if time < ta:
 
-    t_acc = np.sqrt(
-        distance / a_max
+                # acceleration phase
+
+                acc = self.amax
+                vel = acc * time
+                pos = 0.5 * acc * time**2
+
+
+            elif time < ta + tv:
+
+                # constant velocity phase
+
+                acc = 0
+                vel = vmax
+                pos = (
+                    0.5 * self.amax * ta**2
+                    + vmax * (time - ta)
+                )
+
+
+            elif time < ta + tv + td:
+
+                # deceleration phase
+
+                tau = time - ta - tv
+
+                acc = -self.amax
+                vel = vmax - self.amax * tau
+
+                pos = (
+                    0.5 * self.amax * ta**2
+                    + vmax * tv
+                    + vmax * tau
+                    - 0.5 * self.amax * tau**2
+                )
+
+
+            else:
+
+                acc = 0
+                vel = 0
+                pos = distance
+
+
+            position.append(self.q0 + direction * pos)
+
+            velocity.append(direction * vel)
+
+            acceleration.append(direction * acc)
+
+
+
+        return (
+            t,
+            np.array(position),
+            np.array(velocity),
+            np.array(acceleration)
+        )
+
+
+
+if __name__ == "__main__":
+
+
+    trajectory = TrapezoidalProfile(
+        q0=0,
+        qf=1,
+        total_time=5,
+        vmax=0.4,
+        amax=0.5
     )
 
-    t_flat = 0
 
-    v_peak = a_max*t_acc
+    t, q, v, a = trajectory.generate()
 
-else:
 
-    # trapezoidal profile
+    plt.figure(figsize=(10,6))
 
-    t_flat = (
-        distance - 2*d_acc
-    ) / v_max
 
-    v_peak = v_max
+    plt.subplot(3,1,1)
+    plt.plot(t,q)
+    plt.ylabel("Position")
 
 
+    plt.subplot(3,1,2)
+    plt.plot(t,v)
+    plt.ylabel("Velocity")
 
-t1 = t_acc
 
-t2 = t_acc + t_flat
+    plt.subplot(3,1,3)
+    plt.plot(t,a)
+    plt.ylabel("Acceleration")
+    plt.xlabel("Time(s)")
 
-t3 = T
 
+    plt.tight_layout()
 
-
-# ==========================
-# Generate trajectory
-# ==========================
-
-q = []
-v = []
-a = []
-
-
-for t in time:
-
-
-    if t <= t1:
-
-        # acceleration
-
-        acc = a_max
-
-        vel = a_max*t
-
-        pos = (
-            q_start
-            +0.5*a_max*t**2
-        )
-
-
-    elif t <= t2:
-
-        # constant velocity
-
-        acc = 0
-
-        vel = v_peak
-
-        pos = (
-            q_start
-            +d_acc
-            +v_peak*(t-t1)
-        )
-
-
-    else:
-
-        # deceleration
-
-        td = t-t2
-
-        acc = -a_max
-
-        vel = (
-            v_peak
-            -a_max*td
-        )
-
-        pos = (
-            q_end
-            -0.5*a_max*(t3-t)**2
-        )
-
-
-    q.append(pos)
-    v.append(vel)
-    a.append(acc)
-
-
-
-q=np.array(q)
-v=np.array(v)
-a=np.array(a)
-
-
-
-# ==========================
-# Position
-# ==========================
-
-plt.figure(
-    figsize=(8,5)
-)
-
-
-plt.plot(
-    time,
-    q
-)
-
-
-plt.xlabel(
-    "Time (s)"
-)
-
-plt.ylabel(
-    "Position (rad)"
-)
-
-
-plt.title(
-    "Trapezoidal Velocity Position Profile"
-)
-
-
-plt.grid()
-
-
-plt.savefig(
-    os.path.join(
-        result_dir,
-        "trapezoidal_position.png"
-    ),
-    dpi=300
-)
-
-
-plt.close()
-
-
-
-# ==========================
-# Velocity
-# ==========================
-
-plt.figure(
-    figsize=(8,5)
-)
-
-
-plt.plot(
-    time,
-    v
-)
-
-
-plt.xlabel(
-    "Time (s)"
-)
-
-plt.ylabel(
-    "Velocity (rad/s)"
-)
-
-
-plt.title(
-    "Trapezoidal Velocity Profile"
-)
-
-
-plt.grid()
-
-
-plt.savefig(
-    os.path.join(
-        result_dir,
-        "trapezoidal_velocity.png"
-    ),
-    dpi=300
-)
-
-
-plt.close()
-
-
-
-# ==========================
-# Acceleration
-# ==========================
-
-plt.figure(
-    figsize=(8,5)
-)
-
-
-plt.plot(
-    time,
-    a
-)
-
-
-plt.xlabel(
-    "Time (s)"
-)
-
-plt.ylabel(
-    "Acceleration (rad/s²)"
-)
-
-
-plt.title(
-    "Trapezoidal Acceleration Profile"
-)
-
-
-plt.grid()
-
-
-plt.savefig(
-    os.path.join(
-        result_dir,
-        "trapezoidal_acceleration.png"
-    ),
-    dpi=300
-)
-
-
-plt.close()
-
-
-
-print("Trapezoidal profile finished")
-
-print(
-    "Saved in:",
-    result_dir
-)
+    plt.show()
