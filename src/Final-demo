@@ -1,6 +1,7 @@
 import pybullet as p
 import pybullet_data
 import time
+from apf_cartesian_planner import APFCartesianPlanner
 import math
 import numpy as np
 import matplotlib.pyplot as plt
@@ -795,21 +796,14 @@ move_arm(
 
 
 
-# =================================================
-# APF Planning
-# =================================================
-
-
 print("======================")
-
-print("APF automatic avoidance")
-
+print("Cartesian APF Planning")
 print("======================")
 
 
-apf_points=apf_path(
+planner = APFCartesianPlanner(
 
-    [
+    start=[
 
         0.75,
 
@@ -819,7 +813,8 @@ apf_points=apf_path(
 
     ],
 
-    [
+
+    goal=[
 
         0.15,
 
@@ -829,21 +824,46 @@ apf_points=apf_path(
 
     ],
 
-    obstacle_position
+
+    obstacle=[
+
+        obstacle_position[0],
+
+        obstacle_position[1],
+
+        obstacle_position[2]
+
+    ],
+
+
+    step_size=0.05,
+
+    max_iter=150
 
 )
 
 
 
-for point in apf_points:
+cartesian_path = planner.generate()
+
+
+
+print(
+    "Generated Cartesian Path:",
+    len(cartesian_path),
+    "points"
+)
+
+
+
+for point in cartesian_path:
 
 
     move_arm(
 
-        point
+        point.tolist()
 
     )
-
 
 
 
